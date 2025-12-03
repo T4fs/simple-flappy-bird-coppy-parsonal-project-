@@ -1,28 +1,34 @@
-import React, { useRef, useEffect, useCallback, useState } from 'react';
-import { GameState, PipeData } from '../types';
+import React, { useRef, useEffect, useCallback } from 'react';
+import { GameState, PipeData, Skin, Theme } from '../types';
 import { 
   GRAVITY, JUMP_STRENGTH, PIPE_SPEED, PIPE_SPAWN_RATE, 
-  PIPE_WIDTH, PIPE_GAP, BIRD_RADIUS, COLORS, GROUND_HEIGHT 
+  PIPE_WIDTH, PIPE_GAP, BIRD_RADIUS, GROUND_HEIGHT, THEMES
 } from '../constants';
 
 interface GameCanvasProps {
   gameState: GameState;
   onScoreUpdate: (score: number) => void;
   onGameOver: () => void;
-  gameTrigger: number; // Used to trigger restart
+  onThemeChange: (themeId: string) => void;
+  gameTrigger: number;
+  currentSkin: Skin;
+  currentTheme: Theme;
 }
 
 const GameCanvas: React.FC<GameCanvasProps> = ({ 
   gameState, 
   onScoreUpdate, 
   onGameOver,
-  gameTrigger
+  onThemeChange,
+  gameTrigger,
+  currentSkin,
+  currentTheme
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(0);
   const frameCountRef = useRef<number>(0);
   
-  // Game Entities Refs (mutable for performance loop)
+  // Game Entities Refs
   const birdY = useRef<number>(300);
   const birdVelocity = useRef<number>(0);
   const pipes = useRef<PipeData[]>([]);
@@ -65,7 +71,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     };
     
     const handleTouch = (e: TouchEvent) => {
-        e.preventDefault(); // Prevent scrolling
+        e.preventDefault();
         jump();
     }
 
@@ -74,7 +80,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     }
 
     window.addEventListener('keydown', handleKeyDown);
-    // Bind to canvas for touch/click to avoid bubbling issues
     const canvas = canvasRef.current;
     if (canvas) {
         canvas.addEventListener('touchstart', handleTouch, { passive: false });
@@ -106,18 +111,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
     // --- Draw Background ---
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, '#60a5fa'); // Light blue
-    gradient.addColorStop(1, '#dbeafe'); // Very light blue
+    gradient.addColorStop(0, currentTheme.skyGradient[0]); 
+    gradient.addColorStop(1, currentTheme.skyGradient[1]);
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
     // --- Update Physics (Only if Playing) ---
     if (gameState === GameState.PLAYING) {
-      // Bird Physics
       birdVelocity.current += GRAVITY;
       birdY.current += birdVelocity.current;
 
-      // Pipe Spawning
       frameCountRef.current++;
       if (frameCountRef.current % PIPE_SPAWN_RATE === 0) {
         const minPipeHeight = 50;
@@ -131,12 +134,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         });
       }
 
-      // Pipe Movement & Collision
       pipes.current.forEach(pipe => {
         pipe.x -= PIPE_SPEED;
 
         // Collision Logic
-        // 1. Horizontal Hit
         const birdLeft = width / 2 - BIRD_RADIUS;
         const birdRight = width / 2 + BIRD_RADIUS;
         const birdTop = birdY.current - BIRD_RADIUS;
@@ -146,7 +147,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         const pipeRight = pipe.x + PIPE_WIDTH;
 
         if (birdRight > pipeLeft && birdLeft < pipeRight) {
-           // Inside pipe horizontal area
            if (birdTop < pipe.topHeight || birdBottom > pipe.topHeight + PIPE_GAP) {
              onGameOver();
            }
@@ -157,13 +157,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           pipe.passed = true;
           score.current += 1;
           onScoreUpdate(score.current);
+          
+          // Check for dynamic theme changes
+          Object.values(THEMES).forEach(theme => {
+            if (theme.unlockScore === score.current && theme.id !== currentTheme.id) {
+                // Only switch if this theme is intended for higher levels (basic progression)
+                // For simplicity, we just check exact matches for unlock thresholds
+                onThemeChange(theme.id);
+            }
+          });
         }
       });
 
-      // Remove off-screen pipes
       pipes.current = pipes.current.filter(pipe => pipe.x + PIPE_WIDTH > -50);
 
-      // Ground/Ceiling Collision
       if (birdY.current + BIRD_RADIUS >= playAreaHeight || birdY.current - BIRD_RADIUS <= 0) {
         onGameOver();
       }
@@ -171,34 +178,33 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
     // --- Draw Pipes ---
     pipes.current.forEach(pipe => {
-      ctx.fillStyle = COLORS.pipe;
-      ctx.strokeStyle = COLORS.pipeBorder;
+      ctx.fillStyle = currentTheme.pipeColor;
+      ctx.strokeStyle = currentTheme.pipeBorder;
       ctx.lineWidth = 2;
 
-      // Top Pipe
+      // Top
       ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.topHeight);
       ctx.strokeRect(pipe.x, 0, PIPE_WIDTH, pipe.topHeight);
 
-      // Bottom Pipe
+      // Bottom
       const bottomPipeY = pipe.topHeight + PIPE_GAP;
       ctx.fillRect(pipe.x, bottomPipeY, PIPE_WIDTH, height - bottomPipeY - GROUND_HEIGHT);
       ctx.strokeRect(pipe.x, bottomPipeY, PIPE_WIDTH, height - bottomPipeY - GROUND_HEIGHT);
       
-      // Pipe Cap Details
-      ctx.fillStyle = '#4ade80'; // lighter green highlight
-      ctx.fillRect(pipe.x + 5, 0, 10, pipe.topHeight); // Top highlight
-      ctx.fillRect(pipe.x + 5, bottomPipeY, 10, height - bottomPipeY - GROUND_HEIGHT); // Bottom highlight
+      // Highlights
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
+      ctx.fillRect(pipe.x + 5, 0, 10, pipe.topHeight); 
+      ctx.fillRect(pipe.x + 5, bottomPipeY, 10, height - bottomPipeY - GROUND_HEIGHT);
     });
 
     // --- Draw Ground ---
-    ctx.fillStyle = COLORS.ground;
+    ctx.fillStyle = currentTheme.groundColor;
     ctx.fillRect(0, playAreaHeight, width, GROUND_HEIGHT);
-    // Ground stripes for movement illusion
-    ctx.fillStyle = COLORS.groundStripes;
+    
+    ctx.fillStyle = currentTheme.groundStripes;
     const stripeWidth = 20;
     let offset = 0;
     if (gameState === GameState.PLAYING) {
-        // Move stripes based on frame count
         offset = (frameCountRef.current * PIPE_SPEED) % (stripeWidth * 2);
     }
     for (let i = -20; i < width + 20; i += stripeWidth * 2) {
@@ -209,48 +215,56 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.lineTo(i - offset + 20, playAreaHeight);
       ctx.fill();
     }
-    // Top border of ground
-    ctx.fillStyle = '#4b5563';
+    
+    ctx.fillStyle = currentTheme.pipeBorder; // Dark border on ground
     ctx.fillRect(0, playAreaHeight, width, 4);
 
 
-    // --- Draw Bird ---
+    // --- Draw Bird (Dynamic Skin) ---
     ctx.save();
     ctx.translate(width / 2, birdY.current);
-    // Rotate bird based on velocity
     const rotation = Math.min(Math.PI / 4, Math.max(-Math.PI / 4, (birdVelocity.current * 0.1)));
     if (gameState === GameState.PLAYING) {
         ctx.rotate(rotation);
     }
     
-    // Bird Body
-    ctx.fillStyle = COLORS.bird;
+    // Body
+    ctx.fillStyle = currentSkin.bodyColor;
     ctx.beginPath();
     ctx.arc(0, 0, BIRD_RADIUS, 0, Math.PI * 2);
     ctx.fill();
     ctx.lineWidth = 2;
-    ctx.strokeStyle = COLORS.birdBorder;
+    ctx.strokeStyle = currentSkin.border;
     ctx.stroke();
 
-    // Bird Eye
-    ctx.fillStyle = 'white';
+    // Eye
+    ctx.fillStyle = currentSkin.eyeColor;
     ctx.beginPath();
     ctx.arc(6, -6, 8, 0, Math.PI * 2);
     ctx.fill();
+    
+    if (currentSkin.id === 'robot') {
+        // Robot eye
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.5)'; // Glow
+        ctx.beginPath();
+        ctx.arc(6, -6, 12, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
     ctx.fillStyle = 'black';
     ctx.beginPath();
     ctx.arc(8, -6, 3, 0, Math.PI * 2);
     ctx.fill();
 
-    // Bird Wing
-    ctx.fillStyle = '#fef08a';
+    // Wing
+    ctx.fillStyle = currentSkin.wingColor;
     ctx.beginPath();
     ctx.ellipse(-6, 4, 10, 6, -0.2, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Bird Beak
-    ctx.fillStyle = '#f97316'; // Orange
+    // Beak
+    ctx.fillStyle = currentSkin.beakColor;
     ctx.beginPath();
     ctx.moveTo(10, 2);
     ctx.lineTo(24, 8);
@@ -261,9 +275,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     ctx.restore();
 
     requestRef.current = requestAnimationFrame(loop);
-  }, [gameState, onGameOver, onScoreUpdate]);
+  }, [gameState, onGameOver, onScoreUpdate, currentSkin, currentTheme, onThemeChange]);
 
-  // Resize Handler
   useEffect(() => {
     const handleResize = () => {
       if (canvasRef.current) {
@@ -271,7 +284,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         if (parent) {
             canvasRef.current.width = parent.clientWidth;
             canvasRef.current.height = parent.clientHeight;
-            // Re-center bird visually if resizing during start
             if (gameState === GameState.START) {
                 birdY.current = parent.clientHeight / 2;
             }
@@ -279,12 +291,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       }
     };
     window.addEventListener('resize', handleResize);
-    handleResize(); // Initial size
+    handleResize();
 
     return () => window.removeEventListener('resize', handleResize);
   }, [gameState]);
 
-  // Start/Stop Loop
   useEffect(() => {
     requestRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(requestRef.current);
