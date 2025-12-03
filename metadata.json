@@ -1,0 +1,5 @@
+{
+  "name": "Flappy GenAI",
+  "description": "A high-performance Flappy Bird clone featuring a responsive canvas engine and AI-generated commentary on your gameplay skills.",
+  "requestFramePermissions": []
+}
