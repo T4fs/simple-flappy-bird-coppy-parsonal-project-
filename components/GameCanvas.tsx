@@ -25,8 +25,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   currentTheme
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const requestRef = useRef<number>(0);
   const frameCountRef = useRef<number>(0);
+  const animationFrameId = useRef<number>(0);
   
   // Game Entities Refs
   const birdY = useRef<number>(300);
@@ -161,8 +161,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           // Check for dynamic theme changes
           Object.values(THEMES).forEach(theme => {
             if (theme.unlockScore === score.current && theme.id !== currentTheme.id) {
-                // Only switch if this theme is intended for higher levels (basic progression)
-                // For simplicity, we just check exact matches for unlock thresholds
                 onThemeChange(theme.id);
             }
           });
@@ -228,83 +226,107 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.rotate(rotation);
     }
     
-    // Body
-    ctx.fillStyle = currentSkin.bodyColor;
+    // Draw Body with Texture/Pattern
     ctx.beginPath();
     ctx.arc(0, 0, BIRD_RADIUS, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.lineWidth = 2;
+    ctx.save();
+    ctx.clip(); // Clip everything to the bird's circle
+
+    // Base Color
+    ctx.fillStyle = currentSkin.bodyColor;
+    ctx.fillRect(-BIRD_RADIUS, -BIRD_RADIUS, BIRD_RADIUS * 2, BIRD_RADIUS * 2);
+
+    // Apply Pattern
+    if (currentSkin.pattern === 'gradient' && currentSkin.secondaryColor) {
+        const grad = ctx.createLinearGradient(-BIRD_RADIUS, -BIRD_RADIUS, BIRD_RADIUS, BIRD_RADIUS);
+        grad.addColorStop(0, currentSkin.bodyColor);
+        grad.addColorStop(1, currentSkin.secondaryColor);
+        ctx.fillStyle = grad;
+        ctx.fillRect(-BIRD_RADIUS, -BIRD_RADIUS, BIRD_RADIUS * 2, BIRD_RADIUS * 2);
+    } 
+    else if (currentSkin.pattern === 'striped' && currentSkin.secondaryColor) {
+        ctx.fillStyle = currentSkin.secondaryColor;
+        const stripeSize = 6;
+        for (let i = -BIRD_RADIUS; i < BIRD_RADIUS * 2; i += stripeSize * 2) {
+            ctx.fillRect(i - BIRD_RADIUS, -BIRD_RADIUS, stripeSize, BIRD_RADIUS * 2);
+        }
+    }
+    else if (currentSkin.pattern === 'dots' && currentSkin.secondaryColor) {
+        ctx.fillStyle = currentSkin.secondaryColor;
+        const dotSize = 3;
+        const spacing = 8;
+        for(let x = -BIRD_RADIUS; x < BIRD_RADIUS; x+= spacing) {
+            for(let y = -BIRD_RADIUS; y < BIRD_RADIUS; y+= spacing) {
+                ctx.beginPath();
+                ctx.arc(x, y, dotSize, 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+    }
+    else if (currentSkin.pattern === 'checkered' && currentSkin.secondaryColor) {
+        ctx.fillStyle = currentSkin.secondaryColor;
+        const checkSize = 8;
+        for(let x = -BIRD_RADIUS; x < BIRD_RADIUS; x+= checkSize) {
+            for(let y = -BIRD_RADIUS; y < BIRD_RADIUS; y+= checkSize) {
+                 if (((x + BIRD_RADIUS) / checkSize + (y + BIRD_RADIUS) / checkSize) % 2 === 0) {
+                     ctx.fillRect(x, y, checkSize, checkSize);
+                 }
+            }
+        }
+    }
+
+    ctx.restore(); // Remove clipping
+
+    // Border
     ctx.strokeStyle = currentSkin.border;
+    ctx.lineWidth = 3;
     ctx.stroke();
 
     // Eye
     ctx.fillStyle = currentSkin.eyeColor;
     ctx.beginPath();
-    ctx.arc(6, -6, 8, 0, Math.PI * 2);
-    ctx.fill();
-    
-    if (currentSkin.id === 'robot') {
-        // Robot eye
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.5)'; // Glow
-        ctx.beginPath();
-        ctx.arc(6, -6, 12, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    ctx.fillStyle = 'black';
-    ctx.beginPath();
-    ctx.arc(8, -6, 3, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Wing
-    ctx.fillStyle = currentSkin.wingColor;
-    ctx.beginPath();
-    ctx.ellipse(-6, 4, 10, 6, -0.2, 0, Math.PI * 2);
+    ctx.arc(6, -6, 6, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+    
+    // Pupil
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(8, -6, 2, 0, Math.PI * 2);
+    ctx.fill();
 
     // Beak
     ctx.fillStyle = currentSkin.beakColor;
     ctx.beginPath();
-    ctx.moveTo(10, 2);
-    ctx.lineTo(24, 8);
-    ctx.lineTo(10, 14);
+    ctx.moveTo(8, 2);
+    ctx.lineTo(18, 6);
+    ctx.lineTo(8, 10);
     ctx.fill();
     ctx.stroke();
-    
+
+    // Wing
+    ctx.fillStyle = currentSkin.wingColor;
+    ctx.beginPath();
+    ctx.ellipse(-6, 4, 8, 5, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
     ctx.restore();
 
-    requestRef.current = requestAnimationFrame(loop);
-  }, [gameState, onGameOver, onScoreUpdate, currentSkin, currentTheme, onThemeChange]);
+    animationFrameId.current = requestAnimationFrame(loop);
+  }, [gameState, currentTheme, currentSkin, onGameOver, onScoreUpdate, onThemeChange]);
 
   useEffect(() => {
-    const handleResize = () => {
-      if (canvasRef.current) {
-        const parent = canvasRef.current.parentElement;
-        if (parent) {
-            canvasRef.current.width = parent.clientWidth;
-            canvasRef.current.height = parent.clientHeight;
-            if (gameState === GameState.START) {
-                birdY.current = parent.clientHeight / 2;
-            }
-        }
-      }
-    };
-    window.addEventListener('resize', handleResize);
-    handleResize();
-
-    return () => window.removeEventListener('resize', handleResize);
-  }, [gameState]);
-
-  useEffect(() => {
-    requestRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(requestRef.current);
+    animationFrameId.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animationFrameId.current);
   }, [loop]);
 
   return (
-    <canvas
+    <canvas 
       ref={canvasRef}
-      className="block w-full h-full touch-none cursor-pointer"
+      width={window.innerWidth > 480 ? 480 : window.innerWidth}
+      height={window.innerHeight}
+      className="block mx-auto max-w-full touch-none"
     />
   );
 };

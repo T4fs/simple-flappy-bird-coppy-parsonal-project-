@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Skin, AuctionListing } from '../types';
 import { SKINS } from '../constants';
 import { Coins, ShoppingBag, Shirt, X, Gavel, User } from 'lucide-react';
@@ -13,6 +13,62 @@ interface AuctionHouseProps {
   onSell: (skinId: string, price: number) => void;
   onEquip: (skinId: string) => void;
 }
+
+const SkinPreview: React.FC<{ skin: Skin; size?: number }> = ({ skin, size = 12 }) => {
+  const sizeClasses = {
+    12: 'w-12 h-12',
+    16: 'w-16 h-16'
+  };
+  
+  const getBackgroundStyle = () => {
+    const { bodyColor, secondaryColor, pattern } = skin;
+    
+    if (pattern === 'solid') {
+      return { backgroundColor: bodyColor };
+    }
+    
+    if (pattern === 'gradient' && secondaryColor) {
+      return { background: `linear-gradient(135deg, ${bodyColor} 0%, ${secondaryColor} 100%)` };
+    }
+    
+    if (pattern === 'striped' && secondaryColor) {
+      return { 
+        background: `repeating-linear-gradient(90deg, ${bodyColor}, ${bodyColor} 6px, ${secondaryColor} 6px, ${secondaryColor} 12px)`
+      };
+    }
+    
+    if (pattern === 'dots' && secondaryColor) {
+      return {
+        backgroundColor: bodyColor,
+        backgroundImage: `radial-gradient(${secondaryColor} 2px, transparent 2px)`,
+        backgroundSize: '8px 8px'
+      };
+    }
+    
+    if (pattern === 'checkered' && secondaryColor) {
+      return {
+        backgroundColor: bodyColor,
+        backgroundImage: `conic-gradient(${secondaryColor} 0.25turn, transparent 0.25turn 0.5turn, ${secondaryColor} 0.5turn 0.75turn, transparent 0.75turn)`,
+        backgroundSize: '12px 12px'
+      };
+    }
+
+    return { backgroundColor: bodyColor };
+  };
+
+  return (
+    <div className={`${sizeClasses[size as keyof typeof sizeClasses]} rounded-full relative shadow-md`} style={{ ...getBackgroundStyle(), border: `3px solid ${skin.border}` }}>
+      {/* Eye */}
+      <div className="absolute w-[30%] h-[30%] rounded-full bg-white right-[15%] top-[15%] border border-black z-10 overflow-hidden" style={{ backgroundColor: skin.eyeColor }}>
+        <div className="absolute w-[30%] h-[30%] bg-black rounded-full right-[20%] top-[20%]"></div>
+      </div>
+      {/* Wing */}
+      <div className="absolute w-[50%] h-[35%] rounded-full left-[-10%] top-[40%] border border-black transform -rotate-12" style={{ backgroundColor: skin.wingColor }}></div>
+      {/* Beak */}
+      <div className="absolute w-[30%] h-[20%] rounded-full right-[-15%] top-[40%] border border-black z-0" style={{ backgroundColor: skin.beakColor }}></div>
+    </div>
+  );
+};
 
 const AuctionHouse: React.FC<AuctionHouseProps> = ({
   isOpen,
@@ -34,8 +90,8 @@ const AuctionHouse: React.FC<AuctionHouseProps> = ({
       const listings: AuctionListing[] = [];
       const skinKeys = Object.keys(SKINS).filter(k => k !== 'default');
       
-      // Create 5 random listings
-      for (let i = 0; i < 5; i++) {
+      // Create 8 random listings
+      for (let i = 0; i < 8; i++) {
         const randomSkinKey = skinKeys[Math.floor(Math.random() * skinKeys.length)];
         const skin = SKINS[randomSkinKey];
         // Price fluctuates between 80% and 150% of base price
@@ -110,34 +166,30 @@ const AuctionHouse: React.FC<AuctionHouseProps> = ({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-900">
+        <div className="flex-1 overflow-y-auto p-6 bg-slate-900 custom-scrollbar">
           
           {/* WARDROBE TAB */}
           {activeTab === 'wardrobe' && (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {inventory.map(skinId => {
                 const skin = SKINS[skinId];
+                if (!skin) return null;
                 const isEquipped = equippedSkinId === skinId;
                 return (
                   <div key={skinId} className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer hover:scale-105 ${isEquipped ? 'border-green-500 bg-green-500/10' : 'border-slate-700 bg-slate-800 hover:border-slate-500'}`}
                     onClick={() => onEquip(skinId)}
                   >
                     <div className="flex justify-center mb-4">
-                      <div className="w-12 h-12 rounded-full" style={{ backgroundColor: skin.bodyColor, border: `3px solid ${skin.border}` }}>
-                         <div className="absolute w-4 h-4 rounded-full bg-white ml-8 mt-1 border border-black">
-                            <div className="w-1.5 h-1.5 bg-black rounded-full ml-1.5 mt-1.5"></div>
-                         </div>
-                         <div className="absolute w-6 h-4 bg-orange-500 rounded-full ml-8 mt-4 border border-black transform rotate-12"></div>
-                      </div>
+                      <SkinPreview skin={skin} size={16} />
                     </div>
                     <div className="text-center">
-                      <h3 className="text-white font-bold text-sm">{skin.name}</h3>
-                      <p className={`text-xs uppercase font-bold mt-1 ${skin.rarity === 'legendary' ? 'text-yellow-400' : skin.rarity === 'epic' ? 'text-purple-400' : skin.rarity === 'rare' ? 'text-blue-400' : 'text-slate-400'}`}>
+                      <h3 className="text-white font-bold text-sm truncate">{skin.name}</h3>
+                      <p className={`text-[10px] uppercase font-bold mt-1 ${skin.rarity === 'legendary' ? 'text-yellow-400' : skin.rarity === 'epic' ? 'text-purple-400' : skin.rarity === 'rare' ? 'text-blue-400' : 'text-slate-400'}`}>
                         {skin.rarity}
                       </p>
                     </div>
                     {isEquipped && (
-                      <div className="absolute top-2 right-2 bg-green-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      <div className="absolute top-2 right-2 bg-green-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
                         EQUIPPED
                       </div>
                     )}
@@ -155,20 +207,24 @@ const AuctionHouse: React.FC<AuctionHouseProps> = ({
               )}
               {marketListings.map(listing => {
                 const skin = SKINS[listing.skinId];
+                if (!skin) return null;
                 const alreadyOwned = inventory.includes(listing.skinId);
                 const canAfford = coins >= listing.price;
 
                 return (
-                  <div key={listing.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex items-center justify-between group hover:border-slate-600 transition-colors">
+                  <div key={listing.id} className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex items-center justify-between group hover:border-slate-600 transition-colors">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-slate-700 border border-slate-600">
-                         <div className="w-6 h-6 rounded-full" style={{ backgroundColor: skin.bodyColor }}></div>
+                      <div className="w-16 h-16 rounded-lg flex items-center justify-center bg-slate-900 border border-slate-800">
+                         <SkinPreview skin={skin} size={12} />
                       </div>
                       <div>
                         <h4 className="text-white font-bold">{skin.name}</h4>
-                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
                           <User size={12} /> {listing.sellerName}
                         </div>
+                        <span className={`inline-block mt-1 text-[10px] uppercase font-bold px-1.5 rounded ${skin.rarity === 'legendary' ? 'bg-yellow-500/20 text-yellow-400' : skin.rarity === 'epic' ? 'bg-purple-500/20 text-purple-400' : skin.rarity === 'rare' ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700 text-slate-400'}`}>
+                           {skin.rarity}
+                        </span>
                       </div>
                     </div>
                     <div className="text-right">
@@ -202,18 +258,19 @@ const AuctionHouse: React.FC<AuctionHouseProps> = ({
               )}
               {inventory.filter(id => id !== 'default').map(skinId => {
                 const skin = SKINS[skinId];
+                if (!skin) return null;
                 const isEquipped = equippedSkinId === skinId;
                 const estimatedValue = Math.floor(skin.price * 0.7);
 
                 return (
-                  <div key={skinId} className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex items-center justify-between">
+                  <div key={skinId} className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex items-center justify-between">
                      <div className="flex items-center gap-4">
-                       <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-slate-700 border border-slate-600">
-                          <div className="w-6 h-6 rounded-full" style={{ backgroundColor: skin.bodyColor }}></div>
+                       <div className="w-16 h-16 rounded-lg flex items-center justify-center bg-slate-900 border border-slate-800">
+                          <SkinPreview skin={skin} size={12} />
                        </div>
                        <div>
                          <h4 className="text-white font-bold">{skin.name}</h4>
-                         <p className="text-xs text-slate-400">Est. Value: {estimatedValue} Coins</p>
+                         <p className="text-xs text-slate-400 mt-1">Est. Value: <span className="text-yellow-400 font-bold">{estimatedValue}</span> Coins</p>
                        </div>
                      </div>
                      
@@ -221,7 +278,7 @@ const AuctionHouse: React.FC<AuctionHouseProps> = ({
                        <span className="text-xs text-yellow-500 font-bold border border-yellow-500/30 px-3 py-1 rounded bg-yellow-500/10">UNEQUIP TO SELL</span>
                      ) : (
                         sellingId === skinId ? (
-                            <div className="flex items-center gap-2 text-yellow-400 animate-pulse">
+                            <div className="flex items-center gap-2 text-yellow-400 animate-pulse text-sm font-bold">
                                 <Gavel size={16} /> Auctioning...
                             </div>
                         ) : (
@@ -229,7 +286,7 @@ const AuctionHouse: React.FC<AuctionHouseProps> = ({
                                 onClick={() => handleSell(skinId)}
                                 className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-4 py-2 rounded-lg text-sm font-bold transition-colors"
                             >
-                                SELL for {estimatedValue}
+                                SELL
                             </button>
                         )
                      )}

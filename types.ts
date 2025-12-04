@@ -20,15 +20,19 @@ export interface GameDimensions {
   height: number;
 }
 
+export type SkinPattern = 'solid' | 'gradient' | 'striped' | 'dots' | 'checkered';
+
 export interface Skin {
   id: string;
   name: string;
+  pattern: SkinPattern;
   bodyColor: string;
+  secondaryColor?: string; // Used for patterns
   wingColor: string;
   eyeColor: string;
   beakColor: string;
   border: string;
-  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
   price: number; // Base value
 }
 
@@ -49,4 +53,16 @@ export interface AuctionListing {
   price: number;
   sellerName: string;
   expiresAt: number;
+}
+
+export interface PlayerProfile {
+  ip: string;
+  username: string;
+  isSyncing: boolean;
+  lastSyncedAt: number | null;
+}
+
+export interface GameSettings {
+  soundEnabled: boolean;
+  musicEnabled: boolean;
 }

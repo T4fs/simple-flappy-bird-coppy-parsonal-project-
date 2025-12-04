@@ -1,6 +1,7 @@
 import React from 'react';
-import { GameState } from '../types';
-import { Play, RotateCcw, Trophy, ShoppingBag, Coins } from 'lucide-react';
+import { GameState, PlayerProfile } from '../types';
+import { Play, RotateCcw, Trophy, ShoppingBag, Coins, Volume2, VolumeX, Cloud, Check } from 'lucide-react';
+import { getLeaderboard } from '../services/playerService';
 
 interface UIOverlayProps {
   gameState: GameState;
@@ -13,6 +14,10 @@ interface UIOverlayProps {
   onOpenShop: () => void;
   isLoadingAi: boolean;
   unlockedSkin: string | null;
+  playerProfile: PlayerProfile | null;
+  onSync: () => void;
+  soundEnabled: boolean;
+  onToggleSound: () => void;
 }
 
 const UIOverlay: React.FC<UIOverlayProps> = ({
@@ -25,20 +30,68 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
   onRestart,
   onOpenShop,
   isLoadingAi,
-  unlockedSkin
+  unlockedSkin,
+  playerProfile,
+  onSync,
+  soundEnabled,
+  onToggleSound
 }) => {
+  const leaderboard = playerProfile ? getLeaderboard(playerProfile.ip, highScore) : [];
+
   return (
     <div className="absolute inset-0 pointer-events-none flex flex-col justify-center items-center select-none font-sans">
       
-      {/* Coin Counter (Top Right) */}
-      <div className="absolute top-4 right-4 pointer-events-auto bg-black/40 backdrop-blur-md text-yellow-400 px-4 py-2 rounded-full font-bold border border-yellow-500/30 flex items-center gap-2 shadow-lg z-20">
-        <Coins size={20} className="fill-yellow-500" />
-        {coins}
+      {/* HUD: Top Bar */}
+      <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-start pointer-events-auto z-20">
+        
+        {/* Player ID & Sync */}
+        <div className="flex flex-col gap-2 items-start">
+            <div className="bg-black/40 backdrop-blur-md text-white/80 px-3 py-1.5 rounded-lg text-xs font-mono border border-white/10 flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                ID: {playerProfile?.ip || 'Connecting...'}
+            </div>
+            
+            <button 
+                onClick={onSync}
+                disabled={playerProfile?.isSyncing}
+                className="bg-blue-600/80 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+            >
+                {playerProfile?.isSyncing ? (
+                    <>
+                        <Cloud size={12} className="animate-bounce" /> Syncing...
+                    </>
+                ) : (
+                    <>
+                         <Cloud size={12} /> Save to Drive
+                    </>
+                )}
+            </button>
+            {playerProfile?.lastSyncedAt && (
+                <div className="text-[10px] text-green-400 flex items-center gap-1">
+                    <Check size={10} /> Saved to Cloud
+                </div>
+            )}
+        </div>
+
+        {/* Controls */}
+        <div className="flex flex-col gap-2 items-end">
+            <div className="bg-black/40 backdrop-blur-md text-yellow-400 px-4 py-2 rounded-full font-bold border border-yellow-500/30 flex items-center gap-2 shadow-lg">
+                <Coins size={20} className="fill-yellow-500" />
+                {coins}
+            </div>
+            
+            <button 
+                onClick={onToggleSound}
+                className="bg-black/40 hover:bg-black/60 backdrop-blur-md text-white p-2 rounded-full border border-white/10 transition-colors"
+            >
+                {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+            </button>
+        </div>
       </div>
 
       {/* Live Score */}
       {gameState !== GameState.START && (
-        <div className="absolute top-10 text-6xl font-bold text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] z-10">
+        <div className="absolute top-20 text-6xl font-bold text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] z-10">
           {score}
         </div>
       )}
@@ -66,6 +119,21 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
             <ShoppingBag size={24} />
             <span className="text-lg">AUCTION HOUSE</span>
           </button>
+          
+          {/* Simulated Multiplayer Leaderboard */}
+          <div className="mt-4 bg-slate-100 rounded-xl p-3 border border-slate-200">
+             <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase mb-2 border-b border-slate-200 pb-1">
+                 <Trophy size={12} /> Global Leaderboard (Live)
+             </div>
+             <div className="space-y-1">
+                 {leaderboard.map((entry, idx) => (
+                     <div key={idx} className={`flex justify-between text-sm ${entry.name === playerProfile?.ip ? 'text-blue-600 font-bold bg-blue-50 rounded px-1' : 'text-slate-600'}`}>
+                         <span>#{idx + 1} {entry.name}</span>
+                         <span>{entry.score}</span>
+                     </div>
+                 ))}
+             </div>
+          </div>
         </div>
       )}
 
