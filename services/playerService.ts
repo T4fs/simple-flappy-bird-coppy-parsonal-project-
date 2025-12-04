@@ -1,14 +1,12 @@
+
 import { PlayerProfile } from '../types';
 
-export const getPlayerIP = async (): Promise<string> => {
-  try {
-    const response = await fetch('https://api.ipify.org?format=json');
-    const data = await response.json();
-    return data.ip;
-  } catch (error) {
-    console.warn("Could not fetch IP, using fallback");
-    return `Guest-${Math.floor(Math.random() * 10000)}`;
-  }
+export const getStoredUsername = (): string | null => {
+  return localStorage.getItem('flappy-genai-username');
+};
+
+export const setStoredUsername = (username: string): void => {
+  localStorage.setItem('flappy-genai-username', username);
 };
 
 export const syncToGoogleDrive = async (data: any): Promise<boolean> => {
@@ -31,16 +29,19 @@ export const syncToGoogleDrive = async (data: any): Promise<boolean> => {
     }
 };
 
-export const getLeaderboard = (playerIp: string, playerScore: number) => {
+export const getLeaderboard = (playerName: string, playerScore: number) => {
     // Simulate a leaderboard since we have no DB
     const base = [
-        { name: '104.22.54.11', score: 102 },
-        { name: '192.168.1.5', score: 89 },
-        { name: '203.0.113.42', score: 76 },
-        { name: '172.16.254.1', score: 45 },
+        { name: 'SkyWalker99', score: 102 },
+        { name: 'BirdMaster', score: 89 },
+        { name: 'FlapKing', score: 76 },
+        { name: 'NoobSlayer', score: 45 },
     ];
     
     // Inject player if score is good
-    const all = [...base, { name: playerIp || 'You', score: playerScore }];
-    return all.sort((a, b) => b.score - a.score).slice(0, 5);
+    const all = [...base, { name: playerName || 'You', score: playerScore }];
+    // Remove duplicates if player name matches base
+    const unique = all.filter((v,i,a)=>a.findIndex(t=>(t.name===v.name))===i);
+    
+    return unique.sort((a, b) => b.score - a.score).slice(0, 5);
 };
